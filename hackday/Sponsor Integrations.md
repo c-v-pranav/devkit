@@ -16,34 +16,24 @@ Prerequisite: platform running — [Installing DevKit.md](<Installing DevKit.md>
 
 ## Neo4j
 
-Two options. **Option B is faster** — no MCP server, no container changes.
+The agent talks to the graph through the `mcp-neo4j-cypher` MCP server.
 
-| | How the agent talks to it |
-| --- | --- |
-| **A — MCP server** | Calls `mcp-neo4j-cypher` tools |
-| **B — Plain scope** | Runs inline Python with `jq`-read credentials |
-
-### Get a graph first (both options)
+### Get a graph first
 
 1. [console.neo4j.io](https://console.neo4j.io) → sign up
 2. **New Instance** → **AuraDB Free**
 3. Name it, pick a region, **Create**
 4. **Click "Download to continue" immediately** — the password is shown once and cannot be recovered
-5. Optional: load a sample dataset so there's data to query
-6. From **Connection details**, collect:
+5. From **Connection details**, collect:
 
 | Value | Example |
 | --- | --- |
 | `uri` | `neo4j+s://<instance-id>.databases.neo4j.io` |
 | `username` | `neo4j` |
 | `password` | from the downloaded file |
-| `database` | `<instance-id>` — **not** literally `neo4j` |
+| `database` | `neo4j` |
 
----
-
-### Option A — via MCP server
-
-#### 1. Register the MCP server
+### 1. Register the MCP server
 
 **AI Admin → MCP Servers → Add**
 
@@ -77,14 +67,7 @@ Two options. **Option B is faster** — no MCP server, no container changes.
 
 ![Add MCP Server, Raw config](images/neo4j-01-mcp-raw-config.png)
 
-> **⚠️ Set Provider Type now.** Leaving it blank makes step 4 fail with
-> `McpServer provider type '' does not match Scope provider type 'other'`.
-
-> **JSON editor mangling your paste?** It auto-closes brackets. Paste, then fix the trailing braces.
-
-![MCP Servers list](images/neo4j-02-mcp-servers-list.png)
-
-#### 2. Create the provider
+### 2. Create the provider
 
 **Providers → IT → Other → Add**
 
@@ -98,7 +81,7 @@ Two options. **Option B is faster** — no MCP server, no container changes.
 
 ![Add Provider filled in](images/neo4j-04-add-provider-filled.png)
 
-#### 3. Add credentials
+### 3. Add credentials
 
 Name it `neo4j-credentials`, then add four fields — **names must match the `${credential.*}` keys exactly, lowercase:**
 
@@ -108,13 +91,9 @@ Leave Type `String` and Sensitive on. **Next.**
 
 ![Credentials, all four fields](images/neo4j-06-credentials-filled.png)
 
-#### 4. Create the scope — **skip the wizard step**
+### 4. Create the scope — **skip the wizard step**
 
-The wizard's Scope step marks MCP Server *(Optional)* and **silently discards your scope.** Don't use it.
-
-![Wizard scope step — do not use](images/neo4j-07-wizard-scope-optional.png)
-
-Instead: **Provider detail page → Scope tab → Add.** MCP Server is required (`*`) there.
+On the Scope page, select both the Neo4j credential and the MCP server.
 
 | Field | Value |
 | --- | --- |
@@ -122,7 +101,7 @@ Instead: **Provider detail page → Scope tab → Add.** MCP Server is required 
 | Credential | `neo4j-credentials` |
 | MCP Server | `neo4j-mcp` |
 
-![Add Scope from the provider page](images/neo4j-08-provider-add-scope.png)
+![Wizard scope step](images/neo4j-07-wizard-scope-optional.png)
 
 <details>
 <summary>Got <code>provider type '' does not match</code>?</summary>
@@ -134,55 +113,27 @@ You left Provider Type blank in step 1. **AI Admin → MCP Servers → neo4j-mcp
 ![Fix: set provider type](images/neo4j-10-mcp-provider-type-fix.png)
 </details>
 
-#### 5. Attach to a workspace
+### 5. Attach to a workspace
 
 From the **Scope Created** prompt (or Scope tab → row menu), pick your workspace → **Attach**.
 
 ![Workspace scope count](images/neo4j-11-workspace-scopes.png)
 
-#### 6. Enable on a ticket
+### 6. Enable on a ticket
+
+In the top navigation, switch to AI DevOps.
 
 Attaching makes it *available*, not active. When creating a ticket, open **Select Scopes** and pick `neo4j-mcp-scope`.
 
-#### 7. Verify
+### 7. Verify
 
-> Could you run some example queries on our neo4j graph using mcp tools?
+> What schema do you see in neo4j?
 
 The agent should discover and call `get_neo4j_schema` / `read-neo4j-cypher`.
 
 ![Agent calling neo4j MCP tools](images/neo4j-12-agent-calling-tools.png)
 
-> **`command not found`?** `mcp-neo4j-cypher` must exist in the agent image. Add `pip install mcp-neo4j-cypher` to the Dockerfile, or set `command` to `uvx` with `args: ["mcp-neo4j-cypher"]`.
-
----
-
-### Option B — via plain scope
-
-No MCP server. The agent reads credentials and writes its own Python.
-
-#### 1. Create provider + credential + scope
-
-**Providers → IT → Other → Add Provider**
-
-| Field | Value |
-| --- | --- |
-| Name | `neo4j` |
-| Type | `Other` |
-| Account ID | your `uri` |
-
-**Next** → add credential fields `uri` · `username` · `password` · `database` → **Next** → name the scope `neo4j-scope` and **leave MCP Server empty** → pick your workspace.
-
-#### 2. Enable on a ticket
-
-Same as Option A — **Select Scopes** → `neo4j-scope`. Without this the agent has no `other_scopes/neo4j-scope.json` and nothing works.
-
-#### 3. Verify
-
-> Using the neo4j scope, connect to the Neo4j graph and tell me the total node count, total relationship count, and the distinct node labels.
-
-The agent `jq`s the scope file for credentials, then runs inline Python via `from neo4j import GraphDatabase`.
-
-> **`ModuleNotFoundError: neo4j`?** Add `pip install neo4j` to the agent Dockerfile.
+The agent can now read and write Neo4j data.
 
 ---
 
@@ -266,7 +217,7 @@ Same env vars; only billing changes. OpenRouter takes 5% of list price, waived a
 
 ## Vultr
 
-No MCP server, no code — `curl` and `jq` already ship in the agent image.
+Give the agent Vultr credentials and it can manage every aspect of your Vultr account.
 
 ### 1. Get an API key
 
@@ -282,11 +233,6 @@ Sign up and **add a payment method** — API access stays disabled until the acc
    ![Enable API Access](images/vultr-02-enable-api-access.png)
 
 4. **Copy the key from the popup** — shown in full only once
-5. **Access Control List** — two wide-open entries (`0.0.0.0/0`, IPv6 equivalent) are enabled by default, so the key works from anywhere. To restrict: disable both (power-toggle), then **Add IP to Allowlist** → enter subnet + prefix → **Add Subnet**
-
-   ![API Keys and ACL](images/vultr-03-api-keys-acl.png)
-
-> **This allowlist is the only real control on the key** — DuploCloud can't narrow its permissions afterwards.
 
 ### 2. Create provider + credential + scope
 
@@ -296,7 +242,7 @@ Sign up and **add a payment method** — API access stays disabled until the acc
 
 | Field | Value |
 | --- | --- |
-| Name | `vultr-<team>` |
+| Name | `vultr` |
 | Type | `Other` |
 | Account ID | `https://api.vultr.com/v2` |
 | Description | paste the curl from step 3 — **this text goes into the agent's system prompt**, and is the only way to teach it the call without a code change |
@@ -305,29 +251,18 @@ Sign up and **add a payment method** — API access stays disabled until the acc
 
 | Field | Value |
 | --- | --- |
-| Name | `vultr-api` |
+| Name | `vultr` |
 | Key | **`apikey`** — lowercase, type Secret, Sensitive on |
 | Value | your key |
 
-> **⚠️ Lowercase `apikey`.** The platform lowercases credential keys before storing, so `apiKey` reads back `null` and fails as an auth error, not a config one.
 
-**Scope:** name it `vultr-<team>`, leave **MCP Server empty**. Save, then attach to your workspace.
+**Scope:** name it `vultr`, leave **MCP Server empty**. Save, then attach to your workspace.
 
 ### 3. Verify
 
-```bash
-curl -s -H "Authorization: Bearer $(jq -r '.Credential.Data.apikey' other_scopes/vultr-<team>.json)" \
-  https://api.vultr.com/v2/instances
-```
 
-Use the `$(jq ...)` substitution rather than pasting the key — it keeps the raw value out of the Bash approval prompt and out of container logs.
+Create a ticket asking the agent to list your Vultr instances and VPCs. On a new account both lists come back empty, but that still confirms authentication worked.
 
-Run a throwaway ticket asking the agent to list Vultr instances, and check:
-
-- [ ] It uses `$(jq ...)`, not the literal key
-- [ ] Real data comes back
-- [ ] `other_scopes/vultr-<team>.json` exists during the run, gone after
-- [ ] No `.mcp.json` entry was created
 
 ---
 
@@ -340,6 +275,6 @@ Every integration above is the same four things:
 3. **Scope** — MCP Server set (MCP tools) or empty (plain REST)
 4. **Attach to workspace**, then **enable on the ticket**
 
-So: does the sponsor ship an MCP server? Set it on the scope. Otherwise it's a REST API — put the recipe in the provider Description and let the agent `curl` it.
+So: does the sponsor ship an MCP server? Set it on the scope. Otherwise it's a REST API.
 
 **Stuck?** See [Getting Support.md](<Getting Support.md>).
