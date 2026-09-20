@@ -139,12 +139,13 @@ The agent can now read and write Neo4j data.
 
 ## Crusoe / Nebius (via OpenRouter)
 
-Run the agent's model on Crusoe or Nebius GPUs. OpenRouter fronts both at one fixed endpoint; a **preset** pins each request to one provider.
+Run the agent's model on Crusoe or Nebius GPUs. 
+
 
 ### 1. OpenRouter account
 
 1. Sign up at [openrouter.ai](https://openrouter.ai)
-2. **Settings → Credits** — ~$10 is plenty
+2. **Settings → Credits**
 3. **Settings → Keys** → create one. **Copy it now** (`sk-or-v1-…`) — shown once
 
 ### 2. Create a preset per provider
@@ -171,21 +172,9 @@ Run the agent's model on Crusoe or Nebius GPUs. OpenRouter fronts both at one fi
 | — | `z-ai/glm-5.3` | crusoe | 1310720 |
 | — | `openai/gpt-oss-120b` | nebius | 131072 |
 
-### 3. Point the agent at it
+### 3. Confirm the pin
 
-```bash
-ANTHROPIC_BASE_URL=https://openrouter.ai/api      # fixed, same for everyone
-ANTHROPIC_AUTH_TOKEN=sk-or-v1-...                 # your key
-CLAUDE_MODEL=@preset/duplo-nebius-qwen            # or @preset/duplo-crusoe-kimi
-CLAUDE_CODE_MAX_CONTEXT_TOKENS=262144             # the model's real window, from the table
-CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000            # optional; keep below the line above
-```
-
-> **⚠️ Not yet confirmed working through this repo's agent.** Leaving `ANTHROPIC_API_KEY` unset — which the standalone Claude CLI requires for this mode — makes `build_provider_env()` fall through to the Bedrock branch, so the agent talks to Bedrock instead. Verify with step 4 before relying on it.
-
-> **Set `CLAUDE_CODE_MAX_CONTEXT_TOKENS` correctly.** The CLI assumes 200K for unrecognized model ids; if the real window is smaller the session hard-fails mid-run instead of compacting.
-
-### 4. Confirm the pin
+Check the preset works before pointing the agent at it — otherwise a bad preset looks like a dev-kit problem.
 
 ```bash
 curl -s https://openrouter.ai/api/v1/messages \
@@ -203,15 +192,24 @@ Look for `"provider"` matching what you pinned, and `"usage": {"is_byok": false}
 | Wrong provider | Model string isn't `@preset/<slug>`, or fallbacks left on |
 | `rate_limit_exceeded` / `upstream_provider_shared_pool` | That provider is saturated — retry, switch model, or go BYOK |
 
-### Optional — pay Crusoe/Nebius directly (BYOK)
+### 4. Point the agent at it
 
-Same env vars; only billing changes. OpenRouter takes 5% of list price, waived above $25K/month.
+> **Already ran `./run.sh` and picked `anthropic` or `bedrock`?** That's the normal case — you don't need to start over. Run the script below to re-point the same platform at OpenRouter. Your existing Anthropic key / AWS keys are stashed in `.env`, not thrown away, so `./scripts/switch-llm.sh anthropic` (or `bedrock`) switches you back later without re-entering anything.
 
-1. **Settings → BYOK** — confirm Nebius and Crusoe rows exist
-2. Get keys from [studio.nebius.com](https://studio.nebius.com) and [console.crusoecloud.com](https://console.crusoecloud.com) (add credits there too)
-3. Add each key, mark it **Prioritized**. Check the shared-capacity-fallback setting — enabled, a failure on your key silently drops back to credits
-4. Keep a small OpenRouter balance for fees
-5. Re-run the step 4 curl — `usage.is_byok` should flip to `true`. Still `false` means the shared pool served it: check the key is Prioritized and the upstream account has the model
+```bash
+./scripts/switch-llm.sh gateway \
+  --gateway-url https://openrouter.ai/api \
+  --gateway-token sk-or-v1-... \
+  --gateway-model @preset/duplo-nebius-qwen \
+  --gateway-max-context-tokens 262144 \
+  --gateway-compact-window 200000
+```
+
+Haven't run `./run.sh` yet? Start on OpenRouter instead of switching later.  During the execution of `./run.sh` you will be given the choise to use an LLM gateway. 
+
+> **Set the context window correctly.** The CLI assumes 200K for unrecognized model ids; if the real window is smaller the session hard-fails mid-run instead of compacting — that's what `--gateway-max-context-tokens`/`--gateway-compact-window` are for, and the table above has each model's real window.
+
+Verify in the UI: create a ticket and check the LLM picker now offers your preset (e.g. `@preset/duplo-nebius-qwen (LLM Gateway)`).
 
 ---
 
