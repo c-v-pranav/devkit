@@ -1100,6 +1100,19 @@ echo "    UI access granted to $EMAIL (permission set $PS) — re-login if the w
 echo "==> Registering + attaching agent to extension-dev workspace…"
 ./scripts/register-agent.sh "$WS" || echo "    (agent registration failed — run ./scripts/register-agent.sh $WS manually)"
 
+# ── starter devops skill + persona, attached to the workspace (idempotent) ───────
+# A workspace with no persona gives the agent no role, so seed one worked example of the
+# Skill → Persona → Workspace chain. Both are adopted by name on later runs, never rewritten, so
+# whatever you edit in the UI survives. Non-fatal, like the agent/LLM/KB registrations around it.
+PERSONA_LINE=""
+echo "==> Registering + attaching 'devops' persona to extension-dev workspace…"
+if ./scripts/register-persona.sh "$WS"; then
+  PERSONA_LINE="
+  Persona   devops (skill: devops) → attached — edit both under AI Admin → Skills / Personas"
+else
+  echo "    (persona registration failed — run ./scripts/register-persona.sh $WS manually)"
+fi
+
 # ── vendor the Terraform extension's source (idempotent, never fatal) ────────────
 # Puts the real, shipping Terraform extension's SOURCE in extensions/terraform — no .git, no upstream,
 # theirs to edit. Deliberately non-fatal: a private/unreachable source repo, or no network, must not
@@ -1169,7 +1182,7 @@ cat <<EOF
   API       $API
   Workspace extension-dev  ($WS)  ·  agent registered + attached
   Token     DUPLO_ADMIN_TOKEN set in .env (permanent)
-  License   ${LICENSE_STATUS:-set in .env} (Licensing__Token)$LLM_LINE$KB_LINE$TF_EXT_LINE
+  License   ${LICENSE_STATUS:-set in .env} (Licensing__Token)$PERSONA_LINE$LLM_LINE$KB_LINE$TF_EXT_LINE
   Metrics   $METRICS_STATE
             change: set DUPLO_USAGE_METRICS=0|1 in .env, re-run ./run.sh, reload the UI tab  ·  see PRIVACY.md
 
@@ -1179,4 +1192,5 @@ Build & deploy your extension (scripts read the target from .env — no DUPLO_BA
   # or build every extension:    ./scripts/build-all.sh
   # or build a bundled sample:   ./scripts/build-extension.sh samples/helloworld
   # re-attach the agent to another workspace: ./scripts/register-agent.sh <workspace-id>
+  # attach the devops persona elsewhere:       ./scripts/register-persona.sh <workspace-id>
 EOF
