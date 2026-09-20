@@ -34,6 +34,9 @@
 #                                  override with --gateway-max-context-tokens N / --gateway-compact-window N, and
 #                                  see --gateway-disable-betas 1 for Snowflake Cortex (see .env.example).
 #
+# Already running and just want to switch providers (e.g. Bedrock → an LLM gateway) without wiping the
+# DB? Use ./scripts/switch-llm.sh instead of --reset — see its --help.
+#
 # On an EC2 host the provider prompt first probes whether the instance role can actually invoke Bedrock
 # (scripts/detect-bedrock.sh) and, if so, offers that as a third, keyless option.
 #
@@ -583,6 +586,10 @@ if [ "$RESET" = 1 ]; then
            DUPLO_USAGE_METRICS METRICS_CONF; do
     setenv "$k" ""
   done
+  # Also drop any _STASH_<KEY>= lines scripts/switch-llm.sh left behind for a provider swap — a reset
+  # is meant to be total, and a stashed credential surviving it would quietly reappear on the next
+  # ./scripts/switch-llm.sh back to that provider.
+  for k in $(grep -oE '^_STASH_[A-Za-z0-9_]+' "$ENV" 2>/dev/null || true); do setenv "$k" ""; done
   # Don't advertise keeping the license when --reset-license is about to take it: the block below says so.
   if [ "$RESET_LICENSE" = 1 ]; then echo "    cleared configured values."
   else echo "    cleared configured values (your license is kept)."; fi
